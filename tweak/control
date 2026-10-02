@@ -1,0 +1,9 @@
+Package: com.t4mag0.safarimodernizer
+Name: SafariModernizer
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Makes newer websites work and look modern in Safari on iOS 15. Adds modern JavaScript and web features, rewrites modern CSS, works around Safari 15 security-policy bugs, runs sites that need import maps, and identifies as Safari 18.6 so sites send their modern pages. Hold two fingers on a page for 2 seconds (or add #smdebug to the address) to open the log and per-site settings.
+Maintainer: T4MAG0
+Author: T4MAG0
+Section: Tweaks
+Depends: mobilesubstrate, firmware (>= 15.0)
