@@ -1,0 +1,9 @@
+node_modules/
+.theos/
+packages/
+*.deb
+web/polyfill.min.js
+web/smfix.min.js
+tweak/polyfill.h
+tweak/smfix.h
+.DS_Store
