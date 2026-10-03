@@ -1,6 +1,6 @@
 # SafariModernizer
 
-A jailbreak tweak that makes today's websites work, and look modern, in Safari on **iOS 15**.
+A jailbreak tweak that makes today's websites work, and look modern, in Safari on **iOS 15**, and in some other browser apps (iCab, Firefox, Chrome, Brave, Edge, DuckDuckGo).
 
 Many sites now use web features that only exist in newer Safari versions. On iOS 15 they load half-broken: blank pages, dead buttons, missing menus, wrong colors, or no styling at all. SafariModernizer fills in what's missing, right inside Safari, so those sites work again.
 
@@ -19,7 +19,7 @@ Tested on: Google, Gemini, YouTube, ChatGPT, GitHub and Reddit.
 
 ## Requirements
 
-- iOS 15.0 to 15.8, jailbroken
+- iOS 15.0 to 15.8, jailbroken (it will not install on iOS 16 or newer: it crashed Safari there, see the Known limits)
 - Works on all 64-bit iPhones and iPads (arm64 and arm64e)
 
 ## Install
@@ -52,6 +52,7 @@ The **Copy** button copies the log, which is handy for bug reports.
 
 ## Known limits
 
+- iOS 16 and newer are not supported yet. Version 1.0.0 crashed Safari on iOS 16, so from 1.0.1 the package only installs on iOS 15. If you are on iOS 16 and have 1.0.0 installed, remove it in your package manager.
 - Some sign-in pages (for example "Continue with Google" on other sites) use anti-bot checks that don't pass on iOS 15. The tweak does not try to get around them. Use another sign-in method on those sites.
 - Very heavy web apps can load slower than on a newer iPhone.
 

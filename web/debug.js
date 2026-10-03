@@ -5,6 +5,17 @@ import { recentScripts } from './strictdynamic.js';
 
 const logs = [];
 
+// Also copy each note to the phone's system log (read with a USB log tool),
+// since browsers other than Safari can't be inspected on iOS 15
+let sent = 0;
+function toSyslog(msg) {
+  if (sent++ > 300) return;
+  try {
+    const b = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.__smcss;
+    if (b) b.postMessage({ op: 'log', host: location.host, msg: String(msg).slice(0, 400) }).catch(() => {});
+  } catch (e) {}
+}
+
 // Repeated messages with the same key are counted instead of repeated
 const byKey = new Map();
 export function smlogOnce(key, msg) {
@@ -16,6 +27,7 @@ export function smlogOnce(key, msg) {
   if (logs.length > 200) logs.shift();
   render();
   try { console.warn('[SafariModernizer] ' + msg); } catch (x) {}
+  toSyslog(msg);
 }
 
 export function smlog(msg) {
@@ -23,6 +35,7 @@ export function smlog(msg) {
   if (logs.length > 200) logs.shift();
   render();
   try { console.warn('[SafariModernizer] ' + msg); } catch (e) {}
+  toSyslog(msg);
 }
 
 let panel = null;
@@ -124,7 +137,7 @@ function show() {
 let unhandledUndefined = 0;
 export function startDebug() {
   if (window.top !== window) return;
-  smlog('SafariModernizer 1.0.0 on ' + location.host);
+  smlog('SafariModernizer 1.0.1 on ' + location.host);
   window.addEventListener('error', (e) => {
     if (e.target && e.target !== window && e.target.tagName) {
       const t = e.target;

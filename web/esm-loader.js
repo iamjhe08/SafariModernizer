@@ -284,8 +284,13 @@ export function startModuleLoader(bridge) {
     }
     try {
       await loadGraph(url);
-      if (!needs(url, new Set())) { patchRuntimes(); return; }   // Safari ran it natively
       const r = R.get(url);
+      if (!needs(url, new Set())) {
+        // Safari ran it natively, unless this tag already failed: then it's
+        // a file too big to check up front that Safari can't parse
+        if (!script.__smFailed) { patchRuntimes(); return; }
+        r.needs = true;
+      }
       // define everything this graph needs in parallel, then run in order
       const todo = [];
       const walk = (u, s) => { if (s.has(u)) return; s.add(u); const x = R.get(u); if (x.needs) todo.push(x); x.deps.forEach((d) => walk(d, s)); };
@@ -317,7 +322,16 @@ export function startModuleLoader(bridge) {
   };
   const check = () => { if (document.querySelector('script[type="importmap"]')) activate('page has an import map'); };
   window.addEventListener('error', (e) => {
-    if (active || !e || !(e.error instanceof SyntaxError || /SyntaxError|Unexpected|Invalid regular expression|module specifier/i.test(String(e.message)))) return;
+    if (!e) return;
+    // Safari 15 reports a module file it can't parse only as a plain "error"
+    // event on its <script type="module">, with no message (loadout.tf)
+    const t = e.target;
+    if (t && t !== window && t.localName === 'script') {
+      if (t.type === 'module' && t.src) t.__smFailed = 1;
+      if (!active && t.type === 'module' && t.src) activate('a module file failed (' + t.src.split('/').pop().slice(0, 60) + ')');
+      return;
+    }
+    if (active || !(e.error instanceof SyntaxError || /SyntaxError|Unexpected|Invalid regular expression|module specifier/i.test(String(e.message)))) return;
     if (!document.querySelector('script[type="module"]')) return;
     activate('a module failed to load (' + String(e.message).slice(0, 60) + ')');
   }, true);

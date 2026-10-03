@@ -86,6 +86,58 @@ function apply(src, edits) {
   return out;
 }
 
+// Quick fix for big classic scripts whose only problem is lookbehind regex
+// literals (Calendly's 6 MB bundle has two, from the "marked" library).
+// Finds each literal around a hit without parsing the whole file, checks it
+// with the parser, and swaps in new RegExp(...), which the RegExp stand-in
+// handles. Returns null when unsure (the full fix then decides).
+const REGEX_BEFORE = /[(,=:[!&|?{};+\-*%<>~^]$|(?:^|[^\w$.])(?:return|typeof|case|do|else|in|of|void|yield|await|delete|throw|new)$/;
+function literalAt(src, s) {
+  let j = s + 1, cls = false;
+  for (; j < src.length; j++) {
+    const c = src[j];
+    if (c === '\n' || c === '\r') return null;
+    if (c === '\\') { j++; continue; }
+    if (cls) { if (c === ']') cls = false; continue; }
+    if (c === '[') cls = true;
+    else if (c === '/') break;
+  }
+  if (j >= src.length) return null;
+  let e = j + 1;
+  while (e < src.length && /[a-z]/.test(src[e])) e++;
+  return e;
+}
+export function fastFixScript(src) {
+  if (!BAD_REGEX.test(src) || /\bstatic\s*\{/.test(src)) return null;
+  const edits = [], done = new Set();
+  const re = /\(\?<[=!]/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const stop = Math.max(0, m.index - 2000);
+    // The literal's opening slash: nearest one that gives a valid regex
+    // literal covering this hit, in a place where a regex can start. None:
+    // the hit is inside a string, which is fine as it is.
+    let found = false;
+    for (let s = m.index - 1; s >= stop && !found; s--) {
+      const c = src[s];
+      if (c === '\n' || c === '\r') break;
+      if (c !== '/' || src[s - 1] === '\\') continue;
+      if (done.has(s)) { found = true; break; }
+      const e = literalAt(src, s);
+      if (!e || e <= m.index) continue;
+      const before = src.slice(Math.max(0, s - 12), s).replace(/\s+$/, '');
+      if (before && !REGEX_BEFORE.test(before)) continue;
+      let node;
+      try { node = Parser.parseExpressionAt('(' + src.slice(s, e) + ')', 0, { ecmaVersion: 'latest' }); } catch (x) { continue; }
+      if (!node || node.type !== 'Literal' || !node.regex) continue;
+      edits.push({ s, e, t: '(new RegExp(' + JSON.stringify(node.regex.pattern) + ',' + JSON.stringify(node.regex.flags) + '))' });
+      done.add(s);
+      found = true;
+    }
+  }
+  return edits.length ? apply(src, edits) : null;
+}
+
 // Classic script: only fix syntax. Returns null when nothing to change.
 export function fixScript(src) {
   if (!needsSyntaxFix(src)) return null;

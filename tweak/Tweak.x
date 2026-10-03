@@ -72,7 +72,7 @@ static NSString *const kSMUserAgent =
         if (caches) {
             // Rewrites saved by older versions are not reused: bump kSMCacheVer
             // whenever the CSS/JS rewriter changes its output.
-            static const int kSMCacheVer = 7;
+            static const int kSMCacheVer = 8;
             for (int v = 1; v < kSMCacheVer; v++)
                 [[NSFileManager defaultManager] removeItemAtPath:[caches stringByAppendingPathComponent:[NSString stringWithFormat:@"SafariModernizer-v%d", v]] error:nil];
             _diskDir = [caches stringByAppendingPathComponent:[NSString stringWithFormat:@"SafariModernizer-v%d", kSMCacheVer]];
@@ -283,6 +283,12 @@ static BOOL SMIsSiteScript(NSString *stage) {
         replyHandler(@YES, nil);
         return;
     }
+    if ([op isEqualToString:@"log"]) {
+        NSString *msg = [body[@"msg"] isKindOfClass:[NSString class]] ? body[@"msg"] : @"";
+        NSLog(@"[SafariModernizer] %@ %@: %@", [NSBundle mainBundle].bundleIdentifier, h ?: @"", msg);
+        replyHandler(@YES, nil);
+        return;
+    }
     if ([op isEqualToString:@"events"]) {
         replyHandler(self.settings[@"events"] ?: @[], nil);
         return;
@@ -430,3 +436,15 @@ static void SMInstall(WKUserContentController *ucc) {
 }
 
 %end
+
+#pragma mark - Which apps
+
+// Loaded only into the browser apps listed in SafariModernizer.plist. Not
+// every app that uses WebKit: that also loads it into WebKit's own helper
+// processes, which broke Safari.
+%ctor {
+    @autoreleasepool {
+        NSLog(@"[SafariModernizer] on in %@", [NSBundle mainBundle].bundleIdentifier ?: @"?");
+        %init;
+    }
+}

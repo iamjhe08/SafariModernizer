@@ -1,1 +1,1 @@
-{ Filter = { Bundles = ( "com.apple.mobilesafari", "com.apple.SafariViewService" ); }; }
+{ Filter = { Bundles = ( "com.apple.mobilesafari", "com.apple.SafariViewService", "com.visionnova.icab.mobileapp", "org.mozilla.ios.Firefox", "com.google.chrome.ios", "com.brave.ios.browser", "com.microsoft.msedge", "com.duckduckgo.mobile.ios" ); }; }

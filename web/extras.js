@@ -258,4 +258,131 @@
       }, true);
     }
   }
+
+  // Slots filled from code: slot.assign(el) with slotAssignment "manual"
+  // (Safari 16.4; loadout.tf's menus). Emulated with a unique slot name that
+  // the assigned children carry in their "slot" attribute.
+  if (w.HTMLSlotElement && !HTMLSlotElement.prototype.assign) {
+    var slotN = 0;
+    HTMLSlotElement.prototype.assign = function () {
+      if (!this.__smSlot) { this.__smSlot = '__sm-slot-' + (++slotN); this.name = this.__smSlot; }
+      var name = this.__smSlot, prev = this.__smAssigned || [];
+      for (var i = 0; i < prev.length; i++) if (prev[i].getAttribute('slot') === name) prev[i].removeAttribute('slot');
+      var now = [];
+      for (var j = 0; j < arguments.length; j++) {
+        var el = arguments[j];
+        if (el && el.nodeType === 1) { el.setAttribute('slot', name); now.push(el); }
+      }
+      this.__smAssigned = now;
+    };
+  }
+
+  // OffscreenCanvas (Safari 16.4): a detached <canvas> does the same drawing.
+  // transferToImageBitmap() hands back the canvas itself, and the
+  // "bitmaprenderer" context that receives it draws it with a 2D context
+  // (loadout.tf's 3D viewer works this way).
+  if (typeof w.OffscreenCanvas === 'undefined' && w.HTMLCanvasElement) {
+    var OC = function OffscreenCanvas(width, height) {
+      var c = document.createElement('canvas');
+      c.width = width; c.height = height;
+      c.__smOffscreen = 1;
+      c.convertToBlob = function (o) {
+        var self = this;
+        return new Promise(function (res) { self.toBlob(res, o && o.type, o && o.quality); });
+      };
+      c.transferToImageBitmap = function () { return { __smCanvas: this, width: this.width, height: this.height, close: function () {} }; };
+      return c;
+    };
+    Object.defineProperty(OC, Symbol.hasInstance, { value: function (o) { return !!(o && o.__smOffscreen); } });
+    w.OffscreenCanvas = OC;
+    if (!w.OffscreenCanvasRenderingContext2D && w.CanvasRenderingContext2D) w.OffscreenCanvasRenderingContext2D = w.CanvasRenderingContext2D;
+    var getCtx = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type) {
+      if (type !== 'bitmaprenderer') return getCtx.apply(this, arguments);
+      if (this.__smBR) return this.__smBR;
+      var canvas = this, c2 = getCtx.call(this, '2d');
+      if (!c2) return null;
+      this.__smBR = {
+        canvas: canvas,
+        transferFromImageBitmap: function (bmp) {
+          c2.clearRect(0, 0, canvas.width, canvas.height);
+          if (!bmp) return;
+          var src = bmp.__smCanvas || bmp;
+          try { c2.drawImage(src, 0, 0, canvas.width, canvas.height); } catch (e) {}
+        }
+      };
+      return this.__smBR;
+    };
+  }
+
+  // navigator.storage (missing in Safari 15.1) with an in-memory private
+  // file system for getDirectory() (Safari 15.2). Files last until the page
+  // is closed.
+  if (!w.navigator.storage) {
+    var notFound = function (n) { return new DOMException('"' + n + '" was not found', 'NotFoundError'); };
+    var mismatch = function (n) { return new DOMException('"' + n + '" is the wrong kind of entry', 'TypeMismatchError'); };
+    var FileH = function (name) { this.kind = 'file'; this.name = name; this.__data = new Blob([]); this.__mod = Date.now(); };
+    FileH.prototype.getFile = function () { return Promise.resolve(new File([this.__data], this.name, { lastModified: this.__mod })); };
+    FileH.prototype.isSameEntry = function (o) { return Promise.resolve(o === this); };
+    FileH.prototype.createWritable = function (opts) {
+      var fh = this, parts = opts && opts.keepExistingData ? [fh.__data] : [], pos = 0;
+      var size = function () { return new Blob(parts).size; };
+      if (parts.length) pos = 0;
+      return Promise.resolve({
+        write: function (d) {
+          if (d && typeof d === 'object' && !(d instanceof Blob) && !ArrayBuffer.isView(d) && !(d instanceof ArrayBuffer) && d.type) {
+            if (d.type === 'seek') { pos = d.position; return Promise.resolve(); }
+            if (d.type === 'truncate') { parts = [new Blob(parts).slice(0, d.size)]; if (pos > d.size) pos = d.size; return Promise.resolve(); }
+            if (d.position != null) pos = d.position;
+            d = d.data;
+          }
+          var cur = new Blob(parts), add = new Blob([d]);
+          parts = [cur.slice(0, pos), cur.size < pos ? new Uint8Array(pos - cur.size) : new Blob([]), add, cur.slice(pos + add.size)];
+          pos += add.size;
+          return Promise.resolve();
+        },
+        seek: function (p) { pos = p; return Promise.resolve(); },
+        truncate: function (n) { parts = [new Blob(parts).slice(0, n)]; return Promise.resolve(); },
+        close: function () { fh.__data = new Blob(parts); fh.__mod = Date.now(); return Promise.resolve(); },
+        abort: function () { return Promise.resolve(); }
+      });
+    };
+    var DirH = function (name) { this.kind = 'directory'; this.name = name; this.__kids = new Map(); };
+    DirH.prototype.__get = function (name, Kind, kind, opts) {
+      var e = this.__kids.get(name);
+      if (e) return e.kind === kind ? Promise.resolve(e) : Promise.reject(mismatch(name));
+      if (!opts || !opts.create) return Promise.reject(notFound(name));
+      e = new Kind(name); this.__kids.set(name, e);
+      return Promise.resolve(e);
+    };
+    DirH.prototype.getFileHandle = function (n, o) { return this.__get(String(n), FileH, 'file', o); };
+    DirH.prototype.getDirectoryHandle = function (n, o) { return this.__get(String(n), DirH, 'directory', o); };
+    DirH.prototype.removeEntry = function (n, o) {
+      var e = this.__kids.get(String(n));
+      if (!e) return Promise.reject(notFound(n));
+      if (e.kind === 'directory' && e.__kids.size && !(o && o.recursive)) return Promise.reject(new DOMException('Directory is not empty', 'InvalidModificationError'));
+      this.__kids.delete(String(n));
+      return Promise.resolve();
+    };
+    DirH.prototype.isSameEntry = function (o) { return Promise.resolve(o === this); };
+    DirH.prototype.resolve = function () { return Promise.resolve(null); };
+    var iter = function (dir, pick) {
+      var list = Array.from(dir.__kids.entries()), i = 0;
+      var it = { next: function () { return Promise.resolve(i < list.length ? { value: pick(list[i++]), done: false } : { value: undefined, done: true }); } };
+      it[Symbol.asyncIterator] = function () { return it; };
+      return it;
+    };
+    DirH.prototype.entries = function () { return iter(this, function (e) { return [e[0], e[1]]; }); };
+    DirH.prototype.keys = function () { return iter(this, function (e) { return e[0]; }); };
+    DirH.prototype.values = function () { return iter(this, function (e) { return e[1]; }); };
+    DirH.prototype[Symbol.asyncIterator] = DirH.prototype.entries;
+    var root = null;
+    var storage = {
+      estimate: function () { return Promise.resolve({ quota: 1073741824, usage: 0 }); },
+      persist: function () { return Promise.resolve(false); },
+      persisted: function () { return Promise.resolve(false); },
+      getDirectory: function () { return Promise.resolve(root || (root = new DirH(''))); }
+    };
+    try { Object.defineProperty(w.Navigator.prototype, 'storage', { configurable: true, get: function () { return storage; } }); } catch (e) {}
+  }
 })();

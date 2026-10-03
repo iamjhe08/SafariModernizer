@@ -6,7 +6,7 @@
   "license": "MIT",
   "author": "T4MAG0",
   "scripts": {
-    "build": "node build.mjs && esbuild main.js --bundle --platform=browser --format=iife --target=safari15 --minify --legal-comments=none --outfile=smfix.min.js",
+    "build": "node build.mjs",
     "test": "node ../tests/run-all.cjs"
   },
   "dependencies": {
