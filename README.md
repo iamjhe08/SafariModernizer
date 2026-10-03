@@ -95,4 +95,6 @@ The packages land in `tweak/packages/`.
 
 Made by **T4MAG0**.
 
+Inspired by [Polyfills](https://github.com/PoomSmart/Polyfills) by [PoomSmart](https://github.com/PoomSmart), which showed how much older Safari can do with the right fixes. Thanks to PoomSmart for the inspiration, and for bringing parts of SafariModernizer into Polyfills.
+
 Built on many open-source projects. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md); their full license texts are in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt) and are installed with the tweak.
